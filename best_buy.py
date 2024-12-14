@@ -63,6 +63,8 @@ class BestBuyScraper:
         page_number = 1
         while True:
             logging.info(f"Scraping page {page_number}")
+            
+            # Find all product containers on the current page
             product_containers = self.driver.find_elements(By.CSS_SELECTOR, "li.sku-item")
 
             if not product_containers:
@@ -76,7 +78,6 @@ class BestBuyScraper:
                 except Exception as e:
                     name = "N/A"
                     logging.warning(f"Failed to extract product name. Error: {e}")
-                    logging.debug(f"Container HTML: {container.get_attribute('outerHTML')}")  
 
                 try:
                     price = container.find_element(By.CSS_SELECTOR, "div.priceView-customer-price span").text
@@ -94,18 +95,31 @@ class BestBuyScraper:
 
             logging.info(f"Extracted {len(product_containers)} products from page {page_number}")
 
+            # Locate and interact with the "Next" button
             try:
-                next_button = self.driver.find_element(By.CSS_SELECTOR, "button[aria-label='Next page']")
-                if "disabled" in next_button.get_attribute("class"):
+                next_button = self.driver.find_element(By.CSS_SELECTOR, "a.sku-list-page-next")
+                
+                # Check if the "Next" button is disabled
+                if next_button.get_attribute("aria-disabled") == "true":
                     logging.info("No more pages to scrape")
                     break
-                next_button.click()
-                logging.info("Navigating to the next page")
 
+                # Extract the URL for the next page
+                next_page_url = next_button.get_attribute("href")
+                if not next_page_url:
+                    logging.error("Next page URL not found. Stopping pagination.")
+                    break
+
+                # Navigate to the next page
+                self.driver.get(next_page_url)
+                logging.info(f"Navigating to the next page: {next_page_url}")
+                
+                # Wait for the next page to load
                 WebDriverWait(self.driver, 20).until(
                     EC.visibility_of_element_located((By.CSS_SELECTOR, "li.sku-item"))
                 )
                 page_number += 1
+                time.sleep(random.uniform(3, 5))
             except Exception as e:
                 logging.info(f"Pagination ended or an error occurred: {str(e)}")
                 break
